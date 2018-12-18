@@ -1,13 +1,14 @@
 # X-Fetcher
-X-Fetcher project for Berlin demo
+X-Fetcher project for Berlin demo.
 
+## Build/Run Notes
 The QT version is 5.10.1
 
-It's X64 project
-
+Default parameters are included in `demosettings.ini`. You may need to change them for your environment.
 Build instructions:
 
-Please copy demosettings.ini and libXmlRpc.a files to your build folder.
+For Linux, clone XmlRpc-Linux-X-Fetcher into .. because the Qt project uses a relative path. From that directory, run make to create libxmlrpc.a. Install ffmpeg (sudo apt-get install ffmpeg).
 
-Please download ffmpeg file for Linux and copy this file to  your build folder.
+Use qtcreator to build the program `X-Fetcher-Linux`.
 
+Run `X-Fetcher-Linux` without any command-line parameters. It expects to find `demosettings.ini` in its current directory.

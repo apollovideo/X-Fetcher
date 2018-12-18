@@ -13,7 +13,7 @@
 #include "fcommand.h"
 #include "Definitions.h"
 #include "RecorderAccess.h"
-#include "../XmlRpcLinux/XmlRpcValue.h"
+#include "XmlRpcValue.h"
 #include "ServiceSettings.h"
 
 class XFetcher : public QObject
