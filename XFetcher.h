@@ -26,7 +26,7 @@
 #include "fcommand.h"
 #include "Definitions.h"
 #include "RecorderAccess.h"
-#include "../XmlRpcLinux/XmlRpcValue.h"
+#include "XmlRpcValue.h"
 #include "ServiceSettings.h"
 #include "WebApiProcessor.h"
 
