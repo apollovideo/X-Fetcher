@@ -15,7 +15,7 @@
 #include "fcommand.h"
 #include "Definitions.h"
 #include "RecorderAccess.h"
-#include "XmlRpcValue.h"
+#include "../XmlRpcLinux/XmlRpcValue.h"
 #include "ServiceSettings.h"
 #include "XFetcher.h"
 
@@ -41,10 +41,15 @@ private slots:
 public slots:
 	void processXFetcherJob(Job* pJob);
 
+public:
+    XFetcher m_xFetcher;
+
 private:
 	int m_xmlRpcTimeoutSec;
-	XFetcher m_xFetcher;
+
 	Job* m_pJob;
+    WebApiProcessor* m_WebApiProcessor;
+    //SiteProperty_t m_SiteProperty;
 	bool m_stopLoop;
 	QDateTime m_lastEventDT;
 
