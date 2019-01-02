@@ -10,8 +10,8 @@
 #include <QtNetwork/QTcpSocket>
 
 #include "Definitions.h"
-#include "XmlRpc.h"
-#include "xtea.h"
+#include "../XmlRpcLinux/XmlRpc.h"
+#include "../XmlRpcLinux/xtea.h"
 
 #if (QT_VERSION >= QT_VERSION_CHECK(5, 0, 0))
 #define QSTRING_FROM_XMLRPC(xmlrpc) QString::fromLatin1(std::string(xmlrpc).c_str())

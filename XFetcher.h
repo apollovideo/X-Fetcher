@@ -2,19 +2,33 @@
 
 #include <QObject>
 #include <QDebug>
+#include <QProcess>
 #include <QtCore/QCoreApplication>
+//#include <QApplication>
 #include <QtCore/QThread>
 #include <QtCore/QDateTime>
 #include <QtCore/QFile>
 #include <QtCore/QMutex>
 #include <QtCore/QDataStream>
+#include <QUrl>
+#include <QNetworkRequest>
+#include <QNetworkAccessManager>
+#include <QHttpMultiPart>
+#include <QNetworkReply>
+#include <QJsonDocument>
+#include <QScopedPointer>
+#include <QFuture>
+#include <QtConcurrent/QtConcurrentRun>
+#include <QList>
+
 #include "QtCore/qobjectdefs.h"
 
 #include "fcommand.h"
 #include "Definitions.h"
 #include "RecorderAccess.h"
-#include "XmlRpcValue.h"
+#include "../XmlRpcLinux/XmlRpcValue.h"
 #include "ServiceSettings.h"
+#include "WebApiProcessor.h"
 
 class XFetcher : public QObject
 {
@@ -22,6 +36,7 @@ class XFetcher : public QObject
 
 public:
 	explicit XFetcher(QObject* pParent = NULL);
+    explicit XFetcher(Job* pJob, QObject* pParent = NULL);
 	~XFetcher();
 
 private:
@@ -33,8 +48,13 @@ private:
 		quint32 cameraPattern;                          //!< Bit pattern for camera
 	} IndexEntry_t;
 
+public:
+    WebApiProcessor m_WebApiProcessor;
+
 private:
+    //ServiceSettings* m_ServiceSettings;
 	QMutex mutexJobScheduler;                          //!< Mutex for job scheduler
+    QMutex m_mutexFFMPEG;
 	volatile bool m_isStopThreadWanted;                //!< True to stop thread
 	volatile bool m_isSuspendThreadWanted;             //!< True to suspend thread
 	int m_xmlRpcTimeoutSec;
@@ -47,11 +67,21 @@ private:
 	qint32 m_availabilityOfCams;
 
 	Job* m_pJob;
+
 	QDateTime m_lastEventDT;
+
+    QNetworkReply *m_reply;
+
+    QMap<int, UploadReply_t> m_UploadClipMap;
+
+    SiteProperty_t m_SiteProperty;
+
+    QList<QString> m_ClipList;
 
 public:
 	signals:
 	void on_TriggerJob(Job* pJob);
+    //void on_startUploadRequest(QString fileName);
 	//void on_stop();
 
 public slots:
@@ -59,7 +89,7 @@ public slots:
 	void suspendJob();
 
 public:
-	void startJob(Job* pJob);
+    void startJob(Job* pJob);//, WebApiProcessor* pWebApiProcessor);
 
 	//Job* getJobTemplate() { return m_pJob; };
 
@@ -72,13 +102,13 @@ public:
 		{
 			foreach(int i, getChannelsFromBitmask())
 			{
-                QString fileName = QString("%1%2_%3_%4.h264").arg(m_pJob->fileName, QString::number(eventStart.toSecsSinceEpoch()), m_pJob->vehicleName, QString::number(i));
+				QString fileName = QString("%1%2_%3_%4.H264").arg(m_pJob->fileName, QString::number(eventStart.toSecsSinceEpoch()), m_pJob->vehicleName, QString::number(i));
 
 				m_firstIFrame = false;
 				if (this->openArchiveForWriting(i, QString("%1/%2").arg(m_sharedAbsoluteDir, fileName.trimmed()), "") == true)
 				{
 					m_pJob->jobType = JobTypeDownloadVideo;
-                    qDebug() << "File:  " << fileName.trimmed() << " opened";
+                    qDebug() << "Archive file " << fileName.trimmed() << " opened";
 				}
 				else
 				{
@@ -86,10 +116,9 @@ public:
 					return false;
 				}
 			}
-        }
-
+		}
+        qDebug() << "Clip file count: " << m_pJob->fileVideoData.count() << " Camera count from config: " << m_pJob->cameraCount;
 		//if (m_fileVideoData.count() == m_pJob->cameraCount)
-        qDebug() << "File count:  " << m_pJob->fileVideoData.count() << " Configured cameras: " << m_pJob->cameraCount;
 		if (m_pJob->fileVideoData.count() == m_pJob->cameraCount)
 			return true;
 		else
@@ -97,33 +126,60 @@ public:
 	}
 
 	/*! This function closes an open archive.*/
-	void closeArchive()
-	{
-		foreach(int i, getChannelsFromBitmask())
-		{
-			/*QFile *file = m_fileVideoData.value(i);*/
-			QFile *file = m_pJob->fileVideoData.value(i);
-			
-			if (!file->isOpen())
-			{
-				return;
-			}	
+    void closeArchive()
+    {
+        foreach(int i, getChannelsFromBitmask())
+        {
+            /*QFile *file = m_fileVideoData.value(i);*/
+            QFile *file = m_pJob->fileVideoData.value(i);
 
-			//ShellExecute(NULL, L"open", L"C:\\WINDOWS\\system32\\cmd.exe", L"/C C:\\Images\\sparseRecon64.bat", L"C:\\Images\\", SW_SHOWNORMAL);
-			//QProcess *process = new QProcess(this);
-			//QString file = QDir::homepath + "/file.exe";
-			//process->start(file);
-            QString command = "ffmpeg -i " + file->fileName() + " -vcodec copy " + file->fileName().replace(".h264", ".mp4", Qt::CaseSensitive);
-			QProcess::execute(command);
+            if (!file->isOpen())
+            {
+                return;
+            }
 
-            qDebug() << "H264 file closed: " << file->fileName() << " Converted to: " << file->fileName().replace(".h264", ".mp4", Qt::CaseSensitive);
-			// close data file
-			file->close();
-			file->remove();
-		}
-		/*m_fileVideoData.clear();*/
-		m_pJob->fileVideoData.clear();
-	}
+            //ShellExecute(NULL, L"open", L"C:\\WINDOWS\\system32\\cmd.exe", L"/C C:\\Images\\sparseRecon64.bat", L"C:\\Images\\", SW_SHOWNORMAL);
+            //QProcess *process = new QProcess(this);
+            //QString file = QDir::homepath + "/file.exe";
+            //process->start(file);
+
+            m_mutexFFMPEG.lock();
+            QString command = "ffmpeg -i " + file->fileName() + " -vcodec copy " + file->fileName().replace(".H264", ".mp4", Qt::CaseInsensitive);
+            QProcess::execute(command);
+            m_mutexFFMPEG.unlock();
+
+            //connect(&QProcess::execute, SIGNAL(finished(int)), SLOT(uploadClip(int)));
+            //this->doUploadClipRequest(file->fileName().replace(".H264", ".mp4", Qt::CaseInsensitive));
+
+            //this->doUploadClipRequest(file->fileName().replace(".H264", ".mp4", Qt::CaseInsensitive));
+            QString clipName = file->fileName().replace(".H264", ".mp4", Qt::CaseInsensitive);
+            //WebApiProcessor wap;
+            //this->thread()->msleep(300);
+            m_ClipList.append(clipName);
+            //QFuture<void> uploadClipJob = QtConcurrent::run(&m_WebApiProcessor, &WebApiProcessor::doUploadClipRequest, clipName);
+            //uploadClipJob.waitForFinished();
+            //WebApiProcessor* wap = new WebApiProcessor(m_pJob);//, QThread::currentThread());
+            //wap->doUploadStatusRequest(102);
+            //wap->doUploadClipRequest(clipName);
+            //emit on_startUploadRequest(clipName);
+
+            qDebug() << "H264 file closed: " << file->fileName() << " Converted to: " << file->fileName().replace(".H264", ".mp4", Qt::CaseSensitive);
+            // close data file
+            file->close();
+            file->remove();
+/*
+            if(m_ClipList.size() == m_pJob->cameraCount) {
+                for(int i = 0; i < m_ClipList.size(); i++) {
+                    QFuture<void> uploadClipJob = QtConcurrent::run(&m_WebApiProcessor, &WebApiProcessor::doUploadClipRequest, m_ClipList[i]);
+                    QThread::msleep(1000);
+                }
+                m_ClipList.clear();
+            }
+  */
+        }
+        /*m_fileVideoData.clear();*/
+        m_pJob->fileVideoData.clear();
+    }
 
 	/*! This function removes an open or closed archive.*/
 	void removeArchive()
@@ -144,8 +200,12 @@ public:
 
 	void doGetVideoJob(Job* pJob);
 
+    void setSiteProperty(Job* pJob) { m_SiteProperty = pJob->SiteProperty; }
+
 private:
 	//Job * getNextContactEventJob();
+
+    //QByteArray XFetcher::buildContent(QString fileName);
 
 	unsigned long processVideoChunk(QByteArray dataVideo, bool isOnlyOneIFrameWanted = false);
 
@@ -236,12 +296,12 @@ private:
 		QFile *file = new QFile(name);
 		// create data file
 		//file->setFileName(name);
-        qDebug() << "Opening file:  " << name;
 		if (!file->open(QIODevice::WriteOnly))
 		{
-            qDebug() << "Cannot open file:  " << name;
+            qDebug() << "Cannot open: " << name;
 			return false;
 		}
+        qDebug() << "File " << name << " opened for writing";
 		/*m_fileVideoData.insert(channel, file);*/
 		m_pJob->fileVideoData.insert(channel, file);
 		// clear list of indices
@@ -250,5 +310,6 @@ private:
 		m_availabilityOfCams = 0;
 		return true;
 	}
+
 
 };

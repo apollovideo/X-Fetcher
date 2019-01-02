@@ -4,11 +4,31 @@ XFetcher::XFetcher(QObject* pParent/* = NULL*/)
 	: QObject(pParent),
 	m_isStopThreadWanted(false),
 	m_isSuspendThreadWanted(false),
-	m_xmlRpcTimeoutSec(10)
+    m_xmlRpcTimeoutSec(10),
+    m_WebApiProcessor(pParent)
 {
 	//m_pJob = pServiceSettings->GetJobFromConfig();
 	//connect(this, SIGNAL(triggerJob(Job*)), this, SLOT(onTriggerJob(Job*)));
 	//connect(this, &XFetcher::on_stop, this, &XFetcher::stopJob);
+    //m_ServiceSettings = new ServiceSettings(pParent);//(QCoreApplication::instance()->thread());//
+    //m_WebApiProcessor = new WebApiProcessor(pParent);
+    //connect(this, &XFetcher::on_startUploadRequest, &m_WebApiProcessor, &WebApiProcessor::doTest, Qt::QueuedConnection);
+    //connect(this, SIGNAL(on_startUploadRequest(QString)), this, SLOT(doTest(QString)));//, Qt::QueuedConnection);
+    m_ClipList.clear();
+    qDebug() << "WebApiProcessor SiteProperty cameras: " << m_SiteProperty.cameras.size();
+}
+
+XFetcher::XFetcher(Job* pJob, QObject* pParent/* = NULL*/ )
+    : QObject(pParent),
+    m_isStopThreadWanted(false),
+    m_isSuspendThreadWanted(false),
+    m_xmlRpcTimeoutSec(10),
+    m_SiteProperty(pJob->SiteProperty),
+    m_WebApiProcessor(pJob, pParent)
+{
+    //m_WebApiProcessor = new WebApiProcessor(pJob, pParent);
+    m_ClipList.clear();
+    qDebug() << "WebApiProcessor with Job SiteProperty cameras: " << m_SiteProperty.cameras.size();
 }
 
 XFetcher::~XFetcher()
@@ -44,12 +64,24 @@ bool XFetcher::isH264StartCodeIncluded(char* pData, int length) const
 /*! This is the thread running the job scheduler.
 *  It carries out batch jobs, which communicate with recorders
 *  over an unstable network link. */
-void XFetcher::startJob(Job* pJob)
+void XFetcher::startJob(Job* pJob)//, WebApiProcessor* pWebApiProcessor)
 {
 	m_isStopThreadWanted = false;
 	m_isSuspendThreadWanted = false;
 	m_pJob = pJob;
-	int recordAvailableDelaySec = 5;
+
+    this->setSiteProperty(pJob);
+    this->m_WebApiProcessor.setSiteProperty(pJob);
+
+    //m_WebApiProcessor = new WebApiProcessor(pJob);
+
+    //m_WebApiProcessor->setSiteProperty(pJob);
+    //qDebug() << m_WebApiProcessor->thread() << " | " << this->thread();
+    //m_WebApiProcessor->moveToThread(QApplication::instance()->thread());  // Move WebApiProcessor back to the original thread
+    //m_WebApiProcessor->setParent(QApplication::instance()->thread());
+    //QScopedPointer<WebApiProcessor> wap(new WebApiProcessor(pJob));
+
+    int recordAvailableDelaySec = 5;
 	//m_fileVideoData.reserve(m_pJob->cameraCount);
 	m_pJob->fileVideoData.reserve(m_pJob->cameraCount);
 	m_sharedAbsoluteDir = m_pJob->videoFolder;
@@ -77,15 +109,15 @@ void XFetcher::startJob(Job* pJob)
 					{
 					case JobTypeDownloadVideo:
 					case JobTypeAutomaticDownloadVideo:
-						doGetVideoJob(pJob);
-						emit on_TriggerJob(pJob);
+                        doGetVideoJob(pJob);
+                        emit on_TriggerJob(pJob);
 						break;
 					default:
 						break;
 					}
 				}
-				// make the thread sleep for 10ms
-				QThread::msleep(100);
+                // make the thread sleep for 10ms
+                QThread::msleep(10);
 			} // while (!m_isStopThreadWanted)
 		}
 		catch (...)
@@ -399,10 +431,21 @@ void XFetcher::doGetVideoJob(Job* pJob)
 			// Check if the output file contains a valid index 
 			if (this->checkVideoData())
 			{
+                if(m_ClipList.size() == m_pJob->cameraCount) {
+                    QFuture<void> uploadClipJob;
+                    for(int i = 0; i < m_ClipList.size(); i++) {
+                        uploadClipJob = QtConcurrent::run(&m_WebApiProcessor, &WebApiProcessor::doUploadClipRequest, m_ClipList[i]);
+                        //while(!uploadClipJob.isFinished()) {
+                            QThread::msleep(1000);
+                        //}
+                    }
+                    m_ClipList.clear();
+                }
 				qDebug() << pJob->jobId << " Job finished at: " << QDateTime::currentDateTime().toString("yyyy/MM/dd_hh:mm:ss");;// << m_fileVideoData.value(getChannelsFromBitmask().first());
 			}
 			else
 			{
+                m_ClipList.clear();
 				qDebug() << "File index error";
 			}
 
@@ -435,3 +478,4 @@ void XFetcher::doGetVideoJob(Job* pJob)
 		}
 	}
 }
+

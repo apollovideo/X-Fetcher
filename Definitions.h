@@ -4,6 +4,7 @@
 #include <QDateTime>
 #include <QtCore>
 #include <QMetaType>
+#include <QNetworkAccessManager>
 
 #define DEFAULTPORT_XMLRPC 60999
 
@@ -114,93 +115,6 @@ enum JobType
 
 //Q_DECLARE_METATYPE(JobType)
 
-typedef struct Job
-{
-	int jobId;
-	QString jobName;
-	JobType jobType;
-	QDateTime connectionLostDateTime;
-	int jobStep;
-	QString vehicleName;
-	QString recorderName;
-	QString recorderIpAddress;
-	QString senderAddress;
-	int xmlRpcPort;
-	bool isEncrypted;
-	QString comment;
-	QString fileName;
-	QString videoFolder;
-	QHash<int, QFile*> fileVideoData;
-	QDateTime startDateTime;
-	QDateTime endDateTime;
-	QDateTime currDateTime;
-	QDate currentDay;
-	QList<ContactEvent_t> listContactEvents;
-	QList<QList<char>> listTimes;
-	int cameraCount;
-	unsigned long iFrameReceivedCameraBitmask;
-	unsigned long cameraWantedBitmask;
-	qint8 doorOpenChannel;
-	qint16 clipDelayStart;
-	qint16 clipDuration;
-	bool triggerEventState;
-	//// Copy constructor 
-	//Job(const Job & j) :
-	//	jobId(j.jobId),
-	//	jobName(j.jobName),
-	//	jobType(j.jobType),
-	//	connectionLostDateTime(j.connectionLostDateTime),
-	//	jobStep(j.jobStep),
-	//	vehicleName(j.vehicleName),
-	//	recorderName(j.recorderName),
-	//	recorderIpAddress(j.recorderIpAddress),
-	//	senderAddress(j.senderAddress),
-	//	xmlRpcPort(j.xmlRpcPort),
-	//	isEncrypted(j.isEncrypted),
-	//	comment(j.comment),
-	//	fileName(j.fileName),
-	//	videoFolder(j.videoFolder),
-	//	startDateTime(j.startDateTime),
-	//	endDateTime(j.endDateTime),
-	//	currDateTime(j.currDateTime),
-	//	currentDay(j.currentDay),
-	//	cameraCount(j.cameraCount),
-	//	iFrameReceivedCameraBitmask(j.iFrameReceivedCameraBitmask),
-	//	doorOpenChannel(j.doorOpenChannel),
-	//	clipDelayStart(j.clipDelayStart),
-	//	clipDuration(j.clipDuration),
-	//	triggerEventState(j.triggerEventState)
-	//{};
-	//Job& operator=(const Job& j)
-	//{
-	//	jobId = j.jobId;
-	//	jobName = j.jobName;
-	//	jobType = j.jobType;
-	//	connectionLostDateTime = j.connectionLostDateTime;
-	//	jobStep = j.jobStep;
-	//	vehicleName = j.vehicleName;
-	//	recorderName = j.recorderName;
-	//	recorderIpAddress = j.recorderIpAddress;
-	//	senderAddress = j.senderAddress;
-	//	xmlRpcPort = j.xmlRpcPort;
-	//	isEncrypted = j.isEncrypted;
-	//	comment = j.comment;
-	//	fileName = j.fileName;
-	//	videoFolder = j.videoFolder;
-	//	startDateTime = j.startDateTime;
-	//	endDateTime = j.endDateTime;
-	//	currDateTime = j.currDateTime;
-	//	currentDay = j.currentDay;
-	//	cameraCount = j.cameraCount;
-	//	iFrameReceivedCameraBitmask = j.iFrameReceivedCameraBitmask;
-	//	doorOpenChannel = j.doorOpenChannel;
-	//	clipDelayStart = j.clipDelayStart;
-	//	clipDuration = j.clipDuration;
-	//	triggerEventState = j.triggerEventState;
-	//	return *this;
-	//};
-} Job;
-
 typedef struct DvrInfo
 {
 	QString deviceType;			//<std::string> Type of the device, e.g.X - DMR 8.
@@ -238,3 +152,160 @@ typedef struct DvrInfo
 	QString	macAddrStr;			//<std::string>
 	int	encoderType;		//<std::string> 0 = H.264; 1 = MPEG4, 2 = MJPEG(see ALG_VID_CODEC_XXX in alg.h)
 } DvrInfo;
+
+typedef struct
+{
+    //int Sequence_Index;
+    qint64  AssetID;
+    qint64  Status;
+    QString ErrMessage;
+} UploadReply_t;
+
+typedef struct
+{
+   qint64  videoID; //<ID (int)> // This is the asset ID
+   qint64  assetStatus; //<status code int>
+   QString ErrMessage;
+} UploadStatus_t;
+
+//! Data type of index entry for I-frame index list
+typedef struct
+{
+    qint64 SiteID;          //<site(bus) id>
+    qint64 AssetIDs[10];    //[<id1>, <id2>, ..., <idn>]
+    qint64 CameraIDs[10];   //[<id1>, <id2>, ..., <idn>]
+    qint64 Weights[10];     //[<w1>, <w2>, ..., <wn>]
+} CapacityRequest_t;
+
+typedef struct
+{
+    //QString RequestStatus;
+    qint64  CapacityID;
+    qint64  Status;
+    QString  ErrMessage;
+} CapacityReply_t;
+
+typedef struct
+{
+    qint64 CapacityID;      //<capacity id from IAPI>
+    qint64 CameraIDs[10];   //[<id1>, <id2>, ..., <idn>]
+    qint64 Counts[10];      //[<count1>, <count2>, ..., <countn>]
+    qint64 Total;           //<total>
+} CapacityStatusReply_t;
+
+typedef struct
+{
+    qint64 channelID;
+    QString label;
+    float weight;
+    bool enabled;
+} CameraProperty_t;
+
+typedef struct
+{
+  qint64 siteID;
+  QString customerApiKey;
+  QString urlApi;
+  QList<CameraProperty_t> cameras;
+} SiteProperty_t;
+
+//static SiteProperty_t SiteProperty;
+
+typedef struct Job
+{
+    int jobId;
+    QString jobName;
+    JobType jobType;
+    QDateTime connectionLostDateTime;
+    int jobStep;
+    QString vehicleName;
+    QString recorderName;
+    qint64 siteID;
+    QString customerApiKey;
+    QString urlApi;
+    QList<float> cameraWeights;
+    QString recorderIpAddress;
+    QString senderAddress;
+    int xmlRpcPort;
+    bool isEncrypted;
+    QString comment;
+    QString fileName;
+    QString videoFolder;
+    QHash<int, QFile*> fileVideoData;
+    QDateTime startDateTime;
+    QDateTime endDateTime;
+    QDateTime currDateTime;
+    QDate currentDay;
+    QList<ContactEvent_t> listContactEvents;
+    QList<QList<char>> listTimes;
+    int cameraCount;
+    unsigned long iFrameReceivedCameraBitmask;
+    unsigned long cameraWantedBitmask;
+    qint8 doorOpenChannel;
+    qint16 clipDelayStart;
+    qint16 clipDuration;
+    bool triggerEventState;
+    SiteProperty_t SiteProperty;
+    //// Copy constructor
+    //Job(const Job & j) :
+    //	jobId(j.jobId),
+    //	jobName(j.jobName),
+    //	jobType(j.jobType),
+    //	connectionLostDateTime(j.connectionLostDateTime),
+    //	jobStep(j.jobStep),
+    //	vehicleName(j.vehicleName),
+    //	recorderName(j.recorderName),
+    //	recorderIpAddress(j.recorderIpAddress),
+    //	senderAddress(j.senderAddress),
+    //	xmlRpcPort(j.xmlRpcPort),
+    //	isEncrypted(j.isEncrypted),
+    //	comment(j.comment),
+    //	fileName(j.fileName),
+    //	videoFolder(j.videoFolder),
+    //	startDateTime(j.startDateTime),
+    //	endDateTime(j.endDateTime),
+    //	currDateTime(j.currDateTime),
+    //	currentDay(j.currentDay),
+    //	cameraCount(j.cameraCount),
+    //	iFrameReceivedCameraBitmask(j.iFrameReceivedCameraBitmask),
+    //	doorOpenChannel(j.doorOpenChannel),
+    //	clipDelayStart(j.clipDelayStart),
+    //	clipDuration(j.clipDuration),
+    //	triggerEventState(j.triggerEventState)
+    //{};
+    //Job& operator=(const Job& j)
+    //{
+    //	jobId = j.jobId;
+    //	jobName = j.jobName;
+    //	jobType = j.jobType;
+    //	connectionLostDateTime = j.connectionLostDateTime;
+    //	jobStep = j.jobStep;
+    //	vehicleName = j.vehicleName;
+    //	recorderName = j.recorderName;
+    //	recorderIpAddress = j.recorderIpAddress;
+    //	senderAddress = j.senderAddress;
+    //	xmlRpcPort = j.xmlRpcPort;
+    //	isEncrypted = j.isEncrypted;
+    //	comment = j.comment;
+    //	fileName = j.fileName;
+    //	videoFolder = j.videoFolder;
+    //	startDateTime = j.startDateTime;
+    //	endDateTime = j.endDateTime;
+    //	currDateTime = j.currDateTime;
+    //	currentDay = j.currentDay;
+    //	cameraCount = j.cameraCount;
+    //	iFrameReceivedCameraBitmask = j.iFrameReceivedCameraBitmask;
+    //	doorOpenChannel = j.doorOpenChannel;
+    //	clipDelayStart = j.clipDelayStart;
+    //	clipDuration = j.clipDuration;
+    //	triggerEventState = j.triggerEventState;
+    //	return *this;
+    //};
+} Job;
+
+
+static QQueue<QMap<int, UploadReply_t>> AssetsQueue;
+
+static QQueue<QMap<int, CapacityStatusReply_t>> CapacityStatusQueue;
+
+static QNetworkAccessManager AccessManager;

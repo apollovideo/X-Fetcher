@@ -33,7 +33,11 @@ public:
 	ServiceSettings(QObject *parent);
 	~ServiceSettings();
 	void write(Job* pJob) const;
-	Job* GetJobFromConfig() { return m_pJob; };
+    Job* GetJobFromConfig() { return m_pJob; }
+    SiteProperty_t GetSite() { return m_SiteProperty; }
+    //static SiteProperty_t SiteProperty;
 private:
 	Job* m_pJob;
+    SiteProperty_t m_SiteProperty;
+    SiteProperty_t GetSiteProperty(qint64 siteID, QString customerApiKey, qulonglong cameraBitMask, QList<float> cameraWeights, QString urlApi);
 };
