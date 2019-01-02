@@ -1,5 +1,5 @@
 QT -= gui
-QT += core network multimedia concurrent
+QT += core network multimedia websockets concurrent
 
 CONFIG -= app_bundle
 CONFIG += thread
@@ -10,7 +10,7 @@ CONFIG += link_prl
 TEMPLATE = app
 
 DEFINES += QT_DEPRECATED_WARNINGS
-DEFINES += _UNICODE QT_DLL QT_CORE_LIB QT_NETWORK_LIB QT_MULTIMEDIA_LIB QT_CONCURRENT_LIB
+DEFINES += _UNICODE QT_DLL QT_CORE_LIB QT_NETWORK_LIB QT_WEBSOCKETS_LIB QT_MULTIMEDIA_LIB QT_CONCURRENT_LIB
 
 MOC_DIR += Debug
 OBJECTS_DIR += Debug
@@ -26,7 +26,8 @@ SOURCES += \
     main.cpp \
     RecorderAccess.cpp \
     ServiceSettings.cpp \
-    XFetcher.cpp
+    XFetcher.cpp \
+    WebApiProcessor.cpp
 
 HEADERS += \
     ContactEvents.h \
@@ -34,6 +35,7 @@ HEADERS += \
     fcommand.h \
     RecorderAccess.h \
     ServiceSettings.h \
-    XFetcher.h
+    XFetcher.h \
+    WebApiProcessor.h
 
 unix:!macx: LIBS += -L../XmlRpc-Linux-X-Fetcher -lxmlrpc
